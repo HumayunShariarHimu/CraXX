@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CracXX— Blockchain Wallet Inspection Simulation</title>
+
+<style>
+  :root{
+    --bg:#071029; 
+    --card:#0b1220; 
+    --accent:#7c3aed; 
+    --muted:#94a3b8; 
+    --danger:#ef4444;
+  }
+  *{box-sizing:border-box}
+
+  body{
+    margin:0; 
+    background:linear-gradient(180deg,#061028 0%,#071129 100%);
+    color:#e6eef8; 
+    font-family:Inter,system-ui,Arial;
+    display:flex; 
+    justify-content:center;
+    padding:20px;
+  }
+
+  .app{
+    width:100%; 
+    max-width:980px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+    border-radius:14px; 
+    padding:20px; 
+    box-shadow:0 12px 40px rgba(0,0,0,0.6);
+    display:flex; 
+    gap:20px; 
+    flex-wrap:wrap;
+  }
+
+  .panel{
+    flex:1 1 380px;
+    min-width:300px;
+  }
+
+  h1{margin:0 0 6px; font-size:22px;}
+  p.lead{margin:0 0 12px;color:var(--muted);font-size:14px}
+
+  label{display:block;margin-bottom:6px;color:#cfe6ff;font-size:14px}
+
+  textarea,input[type="text"],input[type="file"],select{
+    width:100%; padding:10px;border-radius:8px;
+    border:1px solid rgba(255,255,255,0.05);
+    background:rgba(255,255,255,0.03); 
+    color:white; 
+    font-size:14px;
+  }
+
+  .btn{
+    padding:12px;
+    border-radius:8px;
+    background:linear-gradient(90deg,var(--accent),#5b21b6);
+    color:#fff;
+    border:0;
+    cursor:pointer;
+    font-weight:600;
+  }
+  .btn.secondary{
+    background:transparent;
+    border:1px solid rgba(255,255,255,0.08);
+    color:var(--muted);
+  }
+
+  .warning{
+    background:linear-gradient(90deg, rgba(239,68,68,0.08), rgba(255,255,255,0.02));
+    border-left:4px solid rgba(239,68,68,0.9);
+    padding:12px;
+    border-radius:8px;
+    color:#ffdede;
+    margin-bottom:12px;
+    font-size:14px;
+  }
+
+  .output{
+    background:#071123;
+    padding:12px;
+    border-radius:8px;
+    border:1px dashed rgba(255,255,255,0.05);
+    max-height:420px;
+    overflow:auto;
+  }
+
+  pre{white-space:pre-wrap;font-size:13px;color:#dbeefe}
+
+  footer{
+    width:100%;
+    text-align:center;
+    margin-top:14px;
+    color:var(--muted);
+    font-size:13px;
+  }
+
+  /* --------------------
+      MOBILE RESPONSIVE
+     --------------------*/
+  @media (max-width:720px){
+    body { padding:10px; }
+    .app { padding:14px; }
+    .panel { min-width:100%; }
+
+    h1 { font-size:20px; }
+    p, label { font-size:14px; }
+
+    .btn { width:100%; margin-bottom:10px; }
+
+    .output { max-height:65vh; }
+  }
+</style>
+</head>
+
+<body>
+<div class="app">
+  
+  <div class="panel">
+    <h1>CracXX</h1>
+    <p class="lead">Blockchain Wallet Inspection Simulation</p>
+
+    <div class="warning">
+      <strong>Important:</strong> This tool will NOT output encryption hashes.  
+      For real recovery use <em>btcrecover</em> offline.
+    </div>
+
+    <label>Select Wallet File</label>
+    <input id="file" type="file" />
+
+    <label style="margin-top:12px">Ownership Confirmation</label>
+    <select id="showSensitive">
+      <option value="no">No — safe metadata only</option>
+      <option value="yes">Yes — show limited indicators</option>
+    </select>
+
+    <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn" id="inspectBtn">Inspect</button>
+      <button class="btn secondary" id="clearBtn">Clear</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3 style="margin-top:0;color:var(--muted)">Inspection Output</h3>
+    <div class="output"><pre id="outputPre">No file inspected yet.</pre></div>
+  </div>
+
+  <footer>CracX2 — © Humayun Shariar Himu</footer>
+
+</div>
+
+<script>
+/* unchanged JS (same as earlier, fully safe) */
+const fileInput=document.getElementById('file');
+const inspectBtn=document.getElementById('inspectBtn');
+const clearBtn=document.getElementById('clearBtn');
+const outputPre=document.getElementById('outputPre');
+const showSensitive=document.getElementById('showSensitive');
+
+function safePrint(o){ outputPre.textContent=JSON.stringify(o,null,2); }
+
+function tryBase64Decode(s){
+  try{
+    const clean=s.replace(/\s+/g,'');
+    if(/^[A-Za-z0-9+/]+={0,2}$/.test(clean) && clean.length%4===0){
+      try{ return {ok:true,bytesLen:atob(clean).length}; }
+      catch(e){ return {ok:false}; }
+    }
+    return {ok:false};
+  }catch(e){ return {ok:false}; }
+}
+
+inspectBtn.addEventListener('click', async()=>{
+  const f=fileInput.files[0];
+  if(!f){ alert('Select a file.'); return; }
+  outputPre.textContent='Inspecting…';
+
+  const text=await f.text();
+  let result={ filename:f.name, size_bytes:f.size, notes:[] };
+
+  let parsed=null;
+  try{
+    parsed=JSON.parse(text);
+    result.detected_format='JSON';
+    if(parsed.payload){
+      const b=tryBase64Decode(parsed.payload);
+      if(b.ok){ result.payload_base64=true; result.payload_bytes=b.bytesLen; }
+      result.payload_present=true;
+    }
+  }catch(e){
+    result.detected_format='Raw';
+    const b=tryBase64Decode(text);
+    if(b.ok){ result.raw_base64=true; result.raw_decoded=b.bytesLen; }
+  }
+
+  if(parsed){
+    if(parsed.version) result.version=parsed.version;
+    if(parsed.pbkdf2_iterations) result.pbkdf2_iterations=parsed.pbkdf2_iterations;
+    if(parsed.dpasswordhash) result.dpasswordhash_present=true;
+    if(parsed.sharedKey) result.sharedKey_present=true;
+  }
+
+  result.inspected_at=new Date().toISOString();
+  safePrint(result);
+});
+
+clearBtn.addEventListener('click',()=>{
+  fileInput.value='';
+  outputPre.textContent='No file inspected yet.';
+  showSensitive.value='no';
+});
+</script>
+
+</body>
+</html>
